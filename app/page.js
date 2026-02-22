@@ -7,7 +7,7 @@ export default function Home() {
 
   const loadMatches = async () => {
     const res = await axios.get(
-      `https://api.the-odds-api.com/v4/sports/soccer_epl/odds`,
+      `https://api.the-odds-api.com/v4/sports/soccer/odds`,
       {
         params: {
           apiKey: process.env.a08c833cf6ec998e96139816197460c5,
