@@ -4,39 +4,64 @@ import axios from "axios";
 
 export default function Home() {
   const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const loadMatches = async () => {
-    const res = await axios.get(
-      `https://api.the-odds-api.com/v4/sports/soccer/odds`,
-      {
-        params: {
-          apiKey: process.env.a08c833cf6ec998e96139816197460c5,
-          regions: "eu",
-          markets: "h2h",
-          oddsFormat: "decimal",
-        },
+    try {
+      setLoading(true);
+      setError("");
+      setMatches([]);
+
+      const res = await axios.get(
+        "https://api.the-odds-api.com/v4/sports/soccer/odds",
+        {
+          params: {
+            apiKey: process.env.a08c833cf6ec998e96139816197460c5,
+            regions: "eu",
+            markets: "h2h",
+            oddsFormat: "decimal",
+          },
+        }
+      );
+
+      if (!res.data || res.data.length === 0) {
+        setError("Maç bulunamadı. Plan veya lig erişimini kontrol et.");
+        return;
       }
-    );
 
-    const data = res.data.slice(0, 10).map((m) => {
-      const homeOdds =
-        m.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || 1.5;
+      const data = res.data.slice(0, 10).map((m) => {
+        const bookmaker = m.bookmakers?.[0];
+        const market = bookmaker?.markets?.[0];
+        const outcome = market?.outcomes?.[0];
 
-      const probability = 1 / homeOdds;
-      const ev = probability * homeOdds - 1;
+        if (!outcome) return null;
 
-      return {
-        match: `${m.home_team} vs ${m.away_team}`,
-        odds: homeOdds,
-        ev: ev.toFixed(2),
-      };
-    });
+        const odds = outcome.price;
+        const probability = 1 / odds;
+        const ev = probability * odds - 1;
 
-    setMatches(data);
+        return {
+          match: `${m.home_team} vs ${m.away_team}`,
+          odds,
+          ev: ev.toFixed(2),
+        };
+      }).filter(Boolean);
+
+      setMatches(data);
+
+    } catch (err) {
+      setError("API hatası oluştu. Key veya planı kontrol et.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const bestCoupon = () => {
-    return [...matches].sort((a, b) => b.ev - a.ev).slice(0, 4);
+    return [...matches]
+      .sort((a, b) => b.ev - a.ev)
+      .slice(0, 4);
   };
 
   return (
@@ -50,6 +75,9 @@ export default function Home() {
         Maçları Getir
       </button>
 
+      {loading && <p>Yükleniyor...</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
+
       <div style={{ marginTop: 30 }}>
         {matches.map((m, i) => (
           <div key={i} style={{ background: "#222", padding: 15, marginBottom: 10 }}>
@@ -60,12 +88,16 @@ export default function Home() {
         ))}
       </div>
 
-      <h2 style={{ marginTop: 40 }}>🎯 En Mantıklı 4’lü Kupon</h2>
-      {bestCoupon().map((m, i) => (
-        <div key={i} style={{ background: "#0044cc", padding: 10, marginBottom: 5 }}>
-          {m.match}
-        </div>
-      ))}
+      {matches.length > 0 && (
+        <>
+          <h2 style={{ marginTop: 40 }}>🎯 En Mantıklı 4’lü Kupon</h2>
+          {bestCoupon().map((m, i) => (
+            <div key={i} style={{ background: "#0044cc", padding: 10, marginBottom: 5 }}>
+              {m.match}
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
