@@ -1,6 +1,5 @@
 export const metadata = {
-  title: "AI Bahis Sistemi",
-  description: "AI destekli bahis analiz uygulaması",
+  title: "AI Bahis",
 };
 
 export default function RootLayout({ children }) {
