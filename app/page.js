@@ -1,76 +1,77 @@
-"use client";
-import { useState } from "react";
-
-export default function Home() {
-  const [risk, setRisk] = useState("low");
-  const [stake, setStake] = useState(100);
-
-  // Simüle AI analiz motoru
-  const generateAI = () => {
-    const sampleLeagues = [
-      "Bundesliga",
-      "LaLiga",
-      "Serie A",
-      "Süper Lig",
-      "Ligue 1",
-      "Eredivisie"
+async function getMatches() {
+  try {
+    const leagues = [
+      "soccer_germany_bundesliga",
+      "soccer_spain_la_liga",
+      "soccer_italy_serie_a",
+      "soccer_turkey_super_league",
+      "soccer_france_ligue_one",
+      "soccer_netherlands_eredivisie"
     ];
 
-    const matches = [];
+    let allMatches = [];
 
-    for (let i = 0; i < 15; i++) {
-      const odds =
-        risk === "low"
-          ? (1.30 + Math.random() * 0.40)
-          : risk === "medium"
-          ? (1.70 + Math.random() * 0.60)
-          : (2.30 + Math.random() * 1.50);
+    for (const league of leagues) {
+      const res = await fetch(
+        `https://api.the-odds-api.com/v4/sports/${league}/odds?apiKey=${process.env.ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal`,
+        { cache: "no-store" }
+      );
 
-      const confidence =
-        risk === "low"
-          ? 75 + Math.random() * 20
-          : risk === "medium"
-          ? 60 + Math.random() * 20
-          : 45 + Math.random() * 25;
+      if (!res.ok) continue;
 
-      matches.push({
-        league: sampleLeagues[Math.floor(Math.random() * sampleLeagues.length)],
-        match: `Takım ${i + 1} vs Takım ${i + 2}`,
-        prediction: "MS1 & KG VAR",
-        odds: odds.toFixed(2),
-        confidence: confidence.toFixed(0),
-        banko: confidence > 80
-      });
+      const data = await res.json();
+      allMatches = [...allMatches, ...data];
     }
 
-    return matches;
+    return allMatches.slice(0, 20);
+
+  } catch {
+    return [];
+  }
+}
+
+function analyzeMatch(match) {
+  const outcomes = match.bookmakers?.[0]?.markets?.[0]?.outcomes;
+  if (!outcomes || outcomes.length < 2) return null;
+
+  const home = outcomes.find(o => o.name === match.home_team);
+  const away = outcomes.find(o => o.name === match.away_team);
+
+  if (!home || !away) return null;
+
+  const best = home.price < away.price ? home : away;
+
+  const impliedProb = 1 / best.price;
+  const confidence = (impliedProb * 100).toFixed(0);
+
+  return {
+    league: match.sport_title,
+    match: `${match.home_team} vs ${match.away_team}`,
+    prediction: best.name === match.home_team ? "MS1 & KG VAR" : "MS2 & KG VAR",
+    odds: best.price,
+    confidence,
+    banko: confidence > 65
   };
+}
 
-  const aiMatches = generateAI();
+export default async function Home() {
+  const rawMatches = await getMatches();
 
-  const bestCoupon = [...aiMatches]
-    .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, 4);
+  const analyzed = rawMatches
+    .map(analyzeMatch)
+    .filter(Boolean)
+    .sort((a, b) => b.confidence - a.confidence);
 
+  const bestCoupon = analyzed.slice(0, 4);
   const totalOdds = bestCoupon.reduce((acc, m) => acc * m.odds, 1);
-  const potentialWin = totalOdds * stake;
 
   return (
     <div style={{ background: "#0f172a", minHeight: "100vh", padding: 40, color: "white" }}>
-      <h1 style={{ fontSize: 30 }}>🤖 AI Tahmin Paneli</h1>
+      <h1 style={{ fontSize: 30 }}>🤖 AI Profesyonel Bahis Analizi</h1>
 
-      <div style={{ marginTop: 20 }}>
-        <label>Risk Seviyesi: </label>
-        <select value={risk} onChange={(e) => setRisk(e.target.value)}>
-          <option value="low">Düşük (Banko)</option>
-          <option value="medium">Orta</option>
-          <option value="high">Yüksek</option>
-        </select>
-      </div>
+      <h2 style={{ marginTop: 30 }}>📊 Analiz Edilen Maçlar</h2>
 
-      <h2 style={{ marginTop: 30 }}>📊 AI Analiz Sonuçları</h2>
-
-      {aiMatches.map((m, i) => (
+      {analyzed.slice(0, 12).map((m, i) => (
         <div key={i} style={{
           background: "#1e293b",
           padding: 15,
@@ -80,7 +81,7 @@ export default function Home() {
           <strong>{m.league}</strong> <br/>
           {m.match} <br/>
           Tahmin: {m.prediction} <br/>
-          Oran: {m.odds} <br/>
+          Oran: {m.odds.toFixed(2)} <br/>
           Güven: %{m.confidence} {m.banko && "🔥 BANKO"}
         </div>
       ))}
@@ -94,18 +95,9 @@ export default function Home() {
           marginBottom: 8,
           borderRadius: 6
         }}>
-          {m.match} — {m.odds}
+          {m.match} — {m.odds.toFixed(2)}
         </div>
       ))}
-
-      <div style={{ marginTop: 20 }}>
-        <label>Bahis Tutarı: </label>
-        <input
-          type="number"
-          value={stake}
-          onChange={(e) => setStake(e.target.value)}
-        />
-      </div>
 
       <div style={{
         marginTop: 15,
@@ -113,8 +105,7 @@ export default function Home() {
         padding: 15,
         borderRadius: 8
       }}>
-        Toplam Oran: {totalOdds.toFixed(2)} <br/>
-        Olası Kazanç: {potentialWin.toFixed(2)} ₺
+        Toplam Oran: {totalOdds.toFixed(2)}
       </div>
     </div>
   );
