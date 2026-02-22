@@ -10,7 +10,7 @@ export default function Home() {
       `https://api.the-odds-api.com/v4/sports/soccer_epl/odds`,
       {
         params: {
-          apiKey: process.env.NEXT_PUBLIC_ODDS_API_KEY,
+          apiKey: process.env.Na08c833cf6ec998e96139816197460c5,
           regions: "eu",
           markets: "h2h",
           oddsFormat: "decimal",
