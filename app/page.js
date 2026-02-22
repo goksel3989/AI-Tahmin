@@ -1,71 +1,87 @@
-async function getMatches() {
-  try {
-    const res = await fetch(
-      `https://api.the-odds-api.com/v4/sports/soccer/odds?apiKey=${process.env.ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal`,
-      { cache: "no-store" }
-    );
+"use client";
+import { useState } from "react";
 
-    const data = await res.json();
-    return data.slice(0, 15);
-  } catch {
-    return [];
-  }
-}
+export default function Home() {
+  const [risk, setRisk] = useState("low");
+  const [stake, setStake] = useState(100);
 
-function calculateEV(odds) {
-  const probability = 1 / odds;
-  return probability * odds - 1;
-}
+  // Simüle AI analiz motoru
+  const generateAI = () => {
+    const sampleLeagues = [
+      "Bundesliga",
+      "LaLiga",
+      "Serie A",
+      "Süper Lig",
+      "Ligue 1",
+      "Eredivisie"
+    ];
 
-export default async function Home() {
-  const matches = await getMatches();
+    const matches = [];
 
-  const processed = matches
-    .map((m) => {
-      const outcome = m.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0];
-      if (!outcome) return null;
+    for (let i = 0; i < 15; i++) {
+      const odds =
+        risk === "low"
+          ? (1.30 + Math.random() * 0.40)
+          : risk === "medium"
+          ? (1.70 + Math.random() * 0.60)
+          : (2.30 + Math.random() * 1.50);
 
-      const odds = outcome.price;
-      const ev = calculateEV(odds);
+      const confidence =
+        risk === "low"
+          ? 75 + Math.random() * 20
+          : risk === "medium"
+          ? 60 + Math.random() * 20
+          : 45 + Math.random() * 25;
 
-      return {
-        match: `${m.home_team} vs ${m.away_team}`,
-        odds,
-        ev,
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.ev - a.ev);
+      matches.push({
+        league: sampleLeagues[Math.floor(Math.random() * sampleLeagues.length)],
+        match: `Takım ${i + 1} vs Takım ${i + 2}`,
+        prediction: "MS1 & KG VAR",
+        odds: odds.toFixed(2),
+        confidence: confidence.toFixed(0),
+        banko: confidence > 80
+      });
+    }
 
-  const bestCoupon = processed.slice(0, 4);
+    return matches;
+  };
+
+  const aiMatches = generateAI();
+
+  const bestCoupon = [...aiMatches]
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 4);
+
   const totalOdds = bestCoupon.reduce((acc, m) => acc * m.odds, 1);
+  const potentialWin = totalOdds * stake;
 
   return (
-    <div style={{ background: "#0f172a", minHeight: "100vh", padding: 40, color: "white", fontFamily: "Arial" }}>
-      <h1 style={{ fontSize: 32, marginBottom: 20 }}>🤖 AI Bahis Analiz Paneli</h1>
+    <div style={{ background: "#0f172a", minHeight: "100vh", padding: 40, color: "white" }}>
+      <h1 style={{ fontSize: 30 }}>🤖 AI Tahmin Paneli</h1>
 
-      <h2 style={{ marginBottom: 15 }}>📊 AI Analizli Maçlar</h2>
+      <div style={{ marginTop: 20 }}>
+        <label>Risk Seviyesi: </label>
+        <select value={risk} onChange={(e) => setRisk(e.target.value)}>
+          <option value="low">Düşük (Banko)</option>
+          <option value="medium">Orta</option>
+          <option value="high">Yüksek</option>
+        </select>
+      </div>
 
-      {processed.map((m, i) => (
+      <h2 style={{ marginTop: 30 }}>📊 AI Analiz Sonuçları</h2>
+
+      {aiMatches.map((m, i) => (
         <div key={i} style={{
           background: "#1e293b",
-          padding: 20,
-          marginBottom: 15,
-          borderRadius: 10,
-          display: "flex",
-          justifyContent: "space-between"
+          padding: 15,
+          marginBottom: 10,
+          borderRadius: 8
         }}>
-          <div>
-            <h3>{m.match}</h3>
-            <p>Oran: {m.odds.toFixed(2)}</p>
-          </div>
-          <div style={{
-            background: m.ev > 0 ? "#16a34a" : "#dc2626",
-            padding: "10px 15px",
-            borderRadius: 8
-          }}>
-            EV: {m.ev.toFixed(2)}
-          </div>
+          <strong>{m.league}</strong> <br/>
+          {m.match} <br/>
+          Tahmin: {m.prediction} <br/>
+          Oran: {m.odds} <br/>
+          Güven: %{m.confidence} {m.banko && "🔥 BANKO"}
         </div>
       ))}
 
@@ -74,22 +90,31 @@ export default async function Home() {
       {bestCoupon.map((m, i) => (
         <div key={i} style={{
           background: "#2563eb",
-          padding: 15,
-          marginBottom: 10,
-          borderRadius: 8
+          padding: 10,
+          marginBottom: 8,
+          borderRadius: 6
         }}>
-          {m.match} — {m.odds.toFixed(2)}
+          {m.match} — {m.odds}
         </div>
       ))}
 
+      <div style={{ marginTop: 20 }}>
+        <label>Bahis Tutarı: </label>
+        <input
+          type="number"
+          value={stake}
+          onChange={(e) => setStake(e.target.value)}
+        />
+      </div>
+
       <div style={{
-        marginTop: 20,
+        marginTop: 15,
         background: "#16a34a",
         padding: 15,
-        borderRadius: 8,
-        fontSize: 18
+        borderRadius: 8
       }}>
-        Toplam Oran: {totalOdds.toFixed(2)}
+        Toplam Oran: {totalOdds.toFixed(2)} <br/>
+        Olası Kazanç: {potentialWin.toFixed(2)} ₺
       </div>
     </div>
   );
