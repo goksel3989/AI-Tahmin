@@ -5,46 +5,92 @@ async function getMatches() {
       { cache: "no-store" }
     );
 
-    if (!res.ok) {
-      return { error: "API bağlantı hatası" };
-    }
-
     const data = await res.json();
-
-    if (!data || data.length === 0) {
-      return { error: "Maç bulunamadı veya plan yetersiz" };
-    }
-
-    return data.slice(0, 10);
-
-  } catch (e) {
-    return { error: "Sunucu hatası" };
+    return data.slice(0, 15);
+  } catch {
+    return [];
   }
+}
+
+function calculateEV(odds) {
+  const probability = 1 / odds;
+  return probability * odds - 1;
 }
 
 export default async function Home() {
   const matches = await getMatches();
 
+  const processed = matches
+    .map((m) => {
+      const outcome = m.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0];
+      if (!outcome) return null;
+
+      const odds = outcome.price;
+      const ev = calculateEV(odds);
+
+      return {
+        match: `${m.home_team} vs ${m.away_team}`,
+        odds,
+        ev,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.ev - a.ev);
+
+  const bestCoupon = processed.slice(0, 4);
+  const totalOdds = bestCoupon.reduce((acc, m) => acc * m.odds, 1);
+
   return (
-    <div style={{ background: "#111", minHeight: "100vh", color: "white", padding: 40 }}>
-      <h1>🤖 AI Bahis Sistemi</h1>
+    <div style={{ background: "#0f172a", minHeight: "100vh", padding: 40, color: "white", fontFamily: "Arial" }}>
+      <h1 style={{ fontSize: 32, marginBottom: 20 }}>🤖 AI Bahis Analiz Paneli</h1>
 
-      {matches.error && (
-        <p style={{ color: "red" }}>{matches.error}</p>
-      )}
+      <h2 style={{ marginBottom: 15 }}>📊 AI Analizli Maçlar</h2>
 
-      {!matches.error &&
-        matches.map((m, i) => {
-          const odds =
-            m.bookmakers?.[0]?.markets?.[0]?.outcomes?.[0]?.price || 1.5;
+      {processed.map((m, i) => (
+        <div key={i} style={{
+          background: "#1e293b",
+          padding: 20,
+          marginBottom: 15,
+          borderRadius: 10,
+          display: "flex",
+          justifyContent: "space-between"
+        }}>
+          <div>
+            <h3>{m.match}</h3>
+            <p>Oran: {m.odds.toFixed(2)}</p>
+          </div>
+          <div style={{
+            background: m.ev > 0 ? "#16a34a" : "#dc2626",
+            padding: "10px 15px",
+            borderRadius: 8
+          }}>
+            EV: {m.ev.toFixed(2)}
+          </div>
+        </div>
+      ))}
 
-          return (
-            <div key={i} style={{ background: "#222", padding: 15, marginBottom: 10 }}>
-              <h3>{m.home_team} vs {m.away_team}</h3>
-              <p>Oran: {odds}</p>
-            </div>
-          );
-        })}
+      <h2 style={{ marginTop: 40 }}>🎯 En Mantıklı 4’lü Kupon</h2>
+
+      {bestCoupon.map((m, i) => (
+        <div key={i} style={{
+          background: "#2563eb",
+          padding: 15,
+          marginBottom: 10,
+          borderRadius: 8
+        }}>
+          {m.match} — {m.odds.toFixed(2)}
+        </div>
+      ))}
+
+      <div style={{
+        marginTop: 20,
+        background: "#16a34a",
+        padding: 15,
+        borderRadius: 8,
+        fontSize: 18
+      }}>
+        Toplam Oran: {totalOdds.toFixed(2)}
+      </div>
     </div>
   );
 }
