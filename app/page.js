@@ -1,5 +1,8 @@
 async function getMatches() {
   try {
+    const now = new Date();
+    const todayISO = now.toISOString();
+
     const leagues = [
       "soccer_germany_bundesliga",
       "soccer_spain_la_liga",
@@ -13,7 +16,7 @@ async function getMatches() {
 
     for (const league of leagues) {
       const res = await fetch(
-        `https://api.the-odds-api.com/v4/sports/${league}/odds?apiKey=${process.env.ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal`,
+        `https://api.the-odds-api.com/v4/sports/${league}/odds?apiKey=${process.env.ODDS_API_KEY}&regions=eu&markets=h2h&oddsFormat=decimal&commenceTimeFrom=${todayISO}`,
         { cache: "no-store" }
       );
 
@@ -22,6 +25,11 @@ async function getMatches() {
       const data = await res.json();
       allMatches = [...allMatches, ...data];
     }
+
+    // Tarihe göre sırala (en yakın maç üstte)
+    allMatches.sort(
+      (a, b) => new Date(a.commence_time) - new Date(b.commence_time)
+    );
 
     return allMatches.slice(0, 20);
 
